@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>⚡ Cloud IDE Ultra+</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/clike/clike.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0d1117; --bg-surface: #161b22; --bg-elevated: #21262d;
+            --text-main: #c9d1d9; --text-muted: #6e7681; --text-bright: #f0f6fc;
+            --primary: #58a6ff; --primary-dim: #1f3a5f;
+            --border: #30363d; --border-light: #484f58;
+            --success: #3fb950; --success-dim: #1a3a2a;
+            --error: #f85149; --error-dim: #3d1a1a;
+            --warning: #d29922; --warning-dim: #3d2e00;
+            --accent: #bc8cff;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Noto Sans JP', 'JetBrains Mono', sans-serif; margin: 0; background: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        /* ── Header (simplified: no app inputs) ── */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; height: 44px; background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .logo { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; color: var(--primary); letter-spacing: -0.5px; }
+        .header-actions { display: flex; gap: 6px; align-items: center; }
+
+        /* ── Toolbar ── */
+        .toolbar { display: flex; gap: 8px; align-items: center; padding: 5px 16px; background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .repo-badge { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); background: var(--bg-elevated); padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border); }
+
+        /* ── Tabs ── */
+        .tab-container { display: flex; background: var(--bg-surface); border-bottom: 1px solid var(--border); overflow-x: auto; flex-shrink: 0; scrollbar-width: none; }
+        .tab-container::-webkit-scrollbar { display: none; }
+        .tab { padding: 6px 14px; cursor: pointer; font-size: 12px; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--text-muted); border-bottom: 2px solid transparent; transition: all 0.15s; }
+        .tab:hover { color: var(--text-main); background: var(--bg-elevated); }
+        .tab.active { color: var(--text-bright); border-bottom-color: var(--primary); background: var(--bg-main); }
+        .tab .tab-close { opacity: 0; font-size: 10px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.15s; }
+        .tab:hover .tab-close, .tab.active .tab-close { opacity: 0.6; }
+        .tab .tab-close:hover { opacity: 1; background: var(--bg-elevated); }
+        .add-tab-btn { padding: 6px 14px; cursor: pointer; color: var(--text-muted); font-size: 13px; transition: color 0.15s; }
+        .add-tab-btn:hover { color: var(--primary); }
+
+        /* ── Editor (CodeMirror) ── */
+        .editor-wrapper { flex-grow: 1; position: relative; background: var(--bg-main); min-height: 0; overflow: hidden; }
+        .editor-pane { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: none; }
+        .editor-pane.active { display: block; }
+        .editor-pane .CodeMirror { height: 100%; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6; background: var(--bg-main); }
+
+        /* ── Pipeline ── */
+        .pipeline-panel { background: var(--bg-surface); border-top: 1px solid var(--border); flex-shrink: 0; display: none; }
+        .pipeline-panel.active { display: block; }
+        .pipeline-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 16px; border-bottom: 1px solid var(--border); }
+        .pipeline-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .pipeline-close { cursor: pointer; color: var(--text-muted); font-size: 16px; padding: 2px 6px; border-radius: 4px; background: none; border: none; font-weight: normal; }
+        .pipeline-close:hover { background: var(--bg-elevated); color: var(--text-main); }
+        .pipeline-track { display: flex; align-items: center; padding: 12px 16px; overflow-x: auto; scrollbar-width: none; }
+        .pipeline-track::-webkit-scrollbar { display: none; }
+        .pipeline-step { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; position: relative; z-index: 1; }
+        .step-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; border: 2px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); transition: all 0.3s; }
+        .step-label { font-size: 9px; font-weight: 600; color: var(--text-muted); white-space: nowrap; transition: color 0.3s; }
+        .step-detail { font-size: 8px; color: var(--text-muted); white-space: nowrap; min-height: 12px; }
+        .pipeline-connector { flex: 1; height: 2px; background: var(--border); min-width: 12px; margin: 0 -2px; position: relative; top: -8px; transition: background 0.3s; }
+        .pipeline-step.done .step-icon { border-color: var(--success); background: var(--success-dim); color: var(--success); }
+        .pipeline-step.done .step-label { color: var(--success); }
+        .pipeline-step.active .step-icon { border-color: var(--primary); background: var(--primary-dim); color: var(--primary); animation: pulse-ring 1.5s ease-in-out infinite; }
+        .pipeline-step.active .step-label { color: var(--primary); }
+        .pipeline-step.fail .step-icon { border-color: var(--error); background: var(--error-dim); color: var(--error); }
+        .pipeline-step.fail .step-label { color: var(--error); }
+        @keyframes pulse-ring { 0%,100%{box-shadow:0 0 0 0 rgba(88,166,255,0.3)} 50%{box-shadow:0 0 0 6px rgba(88,166,255,0)} }
+        .pipeline-elapsed { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); padding: 0 16px 8px; text-align: right; }
+
+        /* ── Console ── */
+        .bottom-panel { height: 130px; background: #010409; border-top: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+        .console-header { display: flex; justify-content: space-between; align-items: center; padding: 3px 12px; background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .console-tab { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+        .console-actions button { font-size: 10px; padding: 2px 8px; background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border); }
+        #logConsole { flex-grow: 1; padding: 6px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.5; overflow-y: auto; color: var(--text-muted); }
+        .log-suc { color: var(--success) !important; }
+        .log-err { color: var(--error) !important; }
+        .log-link a { color: var(--primary); text-decoration: underline; }
+        #downloadArea { display: none; padding: 8px 16px; background: var(--success-dim); border-top: 1px solid var(--success); }
+        #downloadLink { color: var(--success); text-decoration: none; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+        /* ── Overlays (Settings / Deploy) ── */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: none; align-items: center; justify-content: center; }
+        .overlay.active { display: flex; }
+        .overlay-full { position: fixed; inset: 0; background: var(--bg-main); z-index: 100; display: none; flex-direction: column; }
+        .overlay-full.active { display: flex; }
+        .modal { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 90%; max-width: 420px; max-height: 90vh; overflow-y: auto; }
+        .modal h3 { margin: 0 0 16px; color: var(--text-bright); font-size: 16px; }
+        .settings-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .settings-header h2 { margin: 0; font-size: 16px; color: var(--text-bright); }
+        .settings-content { padding: 20px; max-width: 560px; margin: 0 auto; width: 100%; overflow-y: auto; flex-grow: 1; }
+        .field-group { margin-bottom: 16px; }
+        .field-group label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .field-group .hint { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+        /* ── Form ── */
+        .field-group input, .field-group select, .settings-content select { background: var(--bg-elevated); color: var(--text-main); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 13px; font-family: 'JetBrains Mono', monospace; width: 100%; transition: border-color 0.15s; }
+        .field-group input:focus, .field-group select:focus { outline: none; border-color: var(--primary); }
+        .field-group input::placeholder { color: var(--text-muted); }
+        button { background: var(--primary); color: var(--text-bright); cursor: pointer; border: none; font-weight: 600; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-family: 'Noto Sans JP', sans-serif; transition: all 0.15s; }
+        button:hover { filter: brightness(1.15); }
+        button:active { transform: scale(0.97); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
+        .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-ghost:hover { color: var(--text-main); border-color: var(--border-light); background: var(--bg-elevated); }
+        .btn-danger { background: var(--error-dim); color: var(--error); border: 1px solid var(--error); }
+        .btn-danger:hover { background: var(--error); color: white; }
+        .btn-full { width: 100%; padding: 12px; font-size: 13px; }
+        .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+        .modal-actions button { flex: 1; }
+    </style>
+</head>
+<body>
+
+<!-- ── Header (clean: no app inputs) ── -->
+<header>
+    <span class="logo">⚡ Cloud IDE Ultra+</span>
+    <div class="header-actions">
+        <button id="deployBtn">🚀 デプロイ</button>
+        <button class="btn-ghost" id="openSettingsBtn">⚙</button>
+    </div>
+</header>
+
+<div class="toolbar">
+    <button class="btn-ghost" onclick="exportZip()">📦 ZIP</button>
+    <span class="repo-badge" id="activeRepoDisplay">未接続</span>
+</div>
+
+<div class="tab-container" id="tabBar">
+    <div class="add-tab-btn" onclick="addNewFile()">+ 新規</div>
+</div>
+<div class="editor-wrapper" id="editorWrapper"></div>
+
+<!-- ── Pipeline ── -->
+<div class="pipeline-panel" id="pipelinePanel">
+    <div class="pipeline-header">
+        <span class="pipeline-title">Pipeline</span>
+        <button class="pipeline-close" onclick="closePipeline()">✕</button>
+    </div>
+    <div class="pipeline-track">
+        <div class="pipeline-step" id="step-upload" data-step="upload"><div class="step-icon">📦</div><div class="step-label">Upload</div><div class="step-detail">www.zip</div></div>
+        <div class="pipeline-connector" id="conn-1"></div>
+        <div class="pipeline-step" id="step-commit" data-step="commit"><div class="step-icon">📝</div><div class="step-label">Commit</div><div class="step-detail">.kt</div></div>
+        <div class="pipeline-connector" id="conn-2"></div>
+        <div class="pipeline-step" id="step-trigger" data-step="trigger"><div class="step-icon">⚡</div><div class="step-label">Trigger</div><div class="step-detail"></div></div>
+        <div class="pipeline-connector" id="conn-3"></div>
+        <div class="pipeline-step" id="step-build" data-step="build"><div class="step-icon">🔨</div><div class="step-label">Build</div><div class="step-detail"></div></div>
+        <div class="pipeline-connector" id="conn-4"></div>
+        <div class="pipeline-step" id="step-done" data-step="done"><div class="step-icon">📥</div><div class="step-label">APK</div><div class="step-detail"></div></div>
+    </div>
+    <div class="pipeline-elapsed" id="pipelineElapsed"></div>
+</div>
+
+<!-- ── Console ── -->
+<div class="bottom-panel">
+    <div class="console-header">
+        <span class="console-tab">Console</span>
+        <div class="console-actions"><button onclick="document.getElementById('logConsole').innerHTML=''">クリア</button></div>
+    </div>
+    <div id="logConsole"></div>
+    <div id="downloadArea"><a id="downloadLink">📥 APKをダウンロード</a></div>
+</div>
+
+<!-- ── Deploy Dialog (app name / ID をここで入力) ── -->
+<div class="overlay" id="deployOverlay">
+    <div class="modal">
+        <h3>🚀 デプロイ設定</h3>
+        <div class="field-group">
+            <label>アプリ名</label>
+            <input type="text" id="appName" placeholder="My App" value="My App">
+        </div>
+        <div class="field-group">
+            <label>パッケージID</label>
+            <input type="text" id="appId" placeholder="com.example.app" value="com.example.app">
+            <div class="hint">Java パッケージ形式（例: com.example.app）</div>
+        </div>
+        <div class="field-group">
+            <label>ブランチ</label>
+            <input type="text" id="branchName" placeholder="main" value="main">
+        </div>
+        <div class="field-group">
+            <label>リポジトリ</label>
+            <div id="deployRepoName" style="font-family:'JetBrains Mono',monospace; font-size:13px; padding:8px 0; color:var(--text-bright);"></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-ghost" onclick="closeDeployDialog()">キャンセル</button>
+            <button id="confirmDeployBtn" onclick="executeDeploy()">デプロイ実行</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Settings ── -->
+<div class="overlay-full" id="settingsOverlay">
+    <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="btn-ghost" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="settings-content">
+        <div class="field-group">
+            <label>GitHub Token</label>
+            <input type="password" id="ghToken" placeholder="ghp_...">
+            <button class="btn-ghost btn-full" id="verifyTokenBtn" style="margin-top:8px;">🔗 トークンを検証</button>
+        </div>
+        <div class="field-group">
+            <label>対象リポジトリ</label>
+            <select id="repoSelect"><option value="">トークンを設定してください...</option></select>
+        </div>
+        <button id="saveSettingsBtn" class="btn-full" style="margin-bottom:16px;">💾 適用して閉じる</button>
+        <div style="padding-top:20px; border-top:1px solid var(--border);">
+            <button class="btn-danger btn-full" onclick="clearAllData()">🗑 データを初期化</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ─── State ───
+    let files = [{ name: 'index.html', content: '<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: sans-serif; }\n  </style>\n</head>\n<body>\n  <h1>Hello Cloud Build</h1>\n  <script>console.log("ready");<\/script>\n</body>\n</html>', active: true }];
+    let editors = {};  // filename → CodeMirror instance
+    const DB_NAME = 'UltraPlus_DB';
+    const STORE_NAME = 'settings';
+
+    // ─── DB (cached, error-safe) ───
+    let _dbCache = null;
+    const getDB = () => {
+        if (_dbCache) return Promise.resolve(_dbCache);
+        return new Promise((res, rej) => {
+            try {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = e => e.target.result.createObjectStore(STORE_NAME);
+                req.onsuccess = e => { _dbCache = e.target.result; res(_dbCache); };
+                req.onerror = e => rej(new Error('IndexedDB failed: ' + e.target.error));
+                req.onblocked = () => rej(new Error('IndexedDB blocked'));
+            } catch (e) { rej(new Error('IndexedDB unavailable')); }
+        });
+    };
+    let _dbWarn = false;
+    async function dbSave(key, val) {
+        try { const db = await getDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME,'readwrite'); tx.objectStore(STORE_NAME).put(val,key); tx.oncomplete=()=>res(); tx.onerror=e=>rej(e.target.error); });
+        } catch(e) { if(!_dbWarn){_dbWarn=true; log("データ保存に失敗。変更はタブを閉じると失われます","err");} }
+    }
+    async function dbGet(key) {
+        try { const db = await getDB(); return new Promise((res,rej)=>{ const r=db.transaction(STORE_NAME).objectStore(STORE_NAME).get(key); r.onsuccess=()=>res(r.result); r.onerror=e=>rej(e.target.error); });
+        } catch(e) { return undefined; }
+    }
+
+    // ─── Logging (XSS-safe) ───
+    const log = (msg, type='') => {
+        const div = document.createElement('div');
+        div.className = type ? `log-${type}` : '';
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        const con = document.getElementById('logConsole');
+        con.appendChild(div); con.scrollTop = con.scrollHeight;
+    };
+    const logWithLink = (msg, url, type='') => {
+        const div = document.createElement('div');
+        div.className = (type?`log-${type}`:'') + ' log-link';
+        const s = document.createElement('span'); s.textContent = `[${new Date().toLocaleTimeString()}] ${msg} `; div.appendChild(s);
+        const a = document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='→ 開く'; div.appendChild(a);
+        const con = document.getElementById('logConsole'); con.appendChild(div); con.scrollTop = con.scrollHeight;
+    };
+
+    // ─── Pipeline UI ───
+    let pipelineTimer=null, pipelineStart=null;
+    function openPipeline() {
+        document.getElementById('pipelinePanel').classList.add('active');
+        document.querySelectorAll('.pipeline-step').forEach(s=>{s.className='pipeline-step';s.querySelector('.step-detail').textContent='';});
+        document.querySelectorAll('.pipeline-connector').forEach(c=>c.style.background='');
+        document.getElementById('pipelineElapsed').textContent='';
+        pipelineStart=Date.now(); clearInterval(pipelineTimer);
+        pipelineTimer=setInterval(updateElapsed,1000); updateElapsed();
+    }
+    function closePipeline() { document.getElementById('pipelinePanel').classList.remove('active'); clearInterval(pipelineTimer); }
+    function updateElapsed() { if(!pipelineStart)return; const s=Math.floor((Date.now()-pipelineStart)/1000); document.getElementById('pipelineElapsed').textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
+    function setStep(id, state, detail) {
+        const el=document.getElementById(`step-${id}`); if(!el)return;
+        el.className=`pipeline-step ${state}`;
+        if(detail!==undefined) el.querySelector('.step-detail').textContent=detail;
+        const conn={commit:'conn-1',trigger:'conn-2',build:'conn-3',done:'conn-4'};
+        if((state==='done'||state==='active')&&conn[id]) document.getElementById(conn[id]).style.background=state==='done'?'var(--success)':'var(--primary)';
+    }
+
+    // ─── CodeMirror: mode detection ───
+    function getMode(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const map = { html:'htmlmixed', htm:'htmlmixed', js:'javascript', mjs:'javascript', css:'css', kt:'text/x-kotlin', java:'text/x-java', json:{name:'javascript',json:true}, xml:'xml', svg:'xml' };
+        return map[ext] || 'htmlmixed';
+    }
+
+    // ─── Debounce helper ───
+    let _saveTimer = null;
+    function debouncedSaveFiles() {
+        clearTimeout(_saveTimer);
+        _saveTimer = setTimeout(() => dbSave('files', files), 500);
+    }
+
+    // ─── Tabs & Editor ───
+    function renderTabs() {
+        const tabBar = document.getElementById('tabBar');
+        const wrapper = document.getElementById('editorWrapper');
+        tabBar.innerHTML = '';
+        wrapper.innerHTML = '';
+        editors = {};
+
+        files.forEach((file, idx) => {
+            // Tab
+            const tab = document.createElement('div');
+            tab.className = `tab ${file.active ? 'active' : ''}`;
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = file.name;
+            nameSpan.style.cursor = 'pointer';
+            nameSpan.ondblclick = e => { e.stopPropagation(); renameFile(idx); };
+            const closeSpan = document.createElement('span');
+            closeSpan.className = 'tab-close';
+            closeSpan.textContent = '✕';
+            closeSpan.onclick = e => { e.stopPropagation(); removeFile(idx); };
+            tab.appendChild(nameSpan);
+            tab.appendChild(closeSpan);
+            tab.onclick = () => switchTab(idx);
+            tabBar.appendChild(tab);
+
+            // Editor pane
+            const pane = document.createElement('div');
+            pane.className = `editor-pane ${file.active ? 'active' : ''}`;
+            pane.id = `pane-${idx}`;
+            wrapper.appendChild(pane);
+
+            // CodeMirror
+            const cm = CodeMirror(pane, {
+                value: file.content,
+                mode: getMode(file.name),
+                theme: 'material-darker',
+                lineNumbers: true,
+                tabSize: 4,
+                indentWithTabs: false,
+                lineWrapping: false,
+                scrollbarStyle: 'native'
+            });
+            cm.on('change', () => {
+                files[idx].content = cm.getValue();
+                debouncedSaveFiles();
+            });
+            editors[idx] = cm;
+
+            // Refresh active editor after DOM paint
+            if (file.active) {
+                requestAnimationFrame(() => cm.refresh());
+            }
+        });
+
+        // Add "+" button
+        const addEl = document.createElement('div');
+        addEl.className = 'add-tab-btn';
+        addEl.textContent = '+ 新規';
+        addEl.onclick = addNewFile;
+        tabBar.appendChild(addEl);
+    }
+
+    function switchTab(idx) {
+        files.forEach((f,i) => f.active = (i===idx));
+        // Update tab and pane visibility without full re-render
+        document.querySelectorAll('.tab').forEach((t,i) => { if(i < files.length) t.className = `tab ${i===idx?'active':''}`; });
+        document.querySelectorAll('.editor-pane').forEach((p,i) => { p.className = `editor-pane ${i===idx?'active':''}`; });
+        if (editors[idx]) requestAnimationFrame(() => editors[idx].refresh());
+        dbSave('files', files);
+    }
+
+    function addNewFile() {
+        const n = prompt("ファイル名:"); if(!n || !n.trim()) return;
+        const name = sanitizeFileName(n.trim());
+        if (!name) return;
+        if (files.some(f => f.name === name)) { log(`「${name}」は既に存在します`, "err"); return; }
+        files.push({name, content:'', active:true});
+        renderTabs();
+    }
+    function renameFile(idx) {
+        const newName = prompt("新しいファイル名:", files[idx].name);
+        if (!newName || !newName.trim() || newName.trim() === files[idx].name) return;
+        const name = sanitizeFileName(newName.trim());
+        if (!name) return;
+        if (files.some((f, i) => i !== idx && f.name === name)) { log(`「${name}」は既に存在します`, "err"); return; }
+        files[idx].name = name;
+        if(editors[idx]) editors[idx].setOption('mode', getMode(name));
+        dbSave('files', files); renderTabs();
+        log(`リネーム → ${name}`, "suc");
+    }
+
+    // ファイル名サニタイズ: パストラバーサル防止
+    function sanitizeFileName(name) {
+        // パス区切り文字と危険な文字を除去
+        let clean = name.replace(/[\/\\]/g, '_').replace(/\.\./g, '_');
+        // 先頭のドット（隠しファイル）は許容するが、ドットのみは不可
+        if (!clean || clean === '.' || clean === '..') {
+            log("無効なファイル名です", "err"); return null;
+        }
+        if (clean !== name) log(`ファイル名を「${clean}」に修正しました`);
+        return clean;
+    }
+    function removeFile(idx) {
+        if (files.length === 1) { log("最後のファイルは削除できません","err"); return; }
+        files.splice(idx, 1);
+        if (!files.some(f=>f.active)) files[Math.max(0,idx-1)].active = true;
+        dbSave('files', files); renderTabs();
+    }
+
+    // ─── Validation ───
+    function validateAppId(appId) {
+        if (!/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(appId)) return 'パッケージIDが不正です。例: com.example.app';
+        const reserved = ['abstract','assert','boolean','break','byte','case','catch','char','class','const','continue','default','do','double','else','enum','extends','final','finally','float','for','goto','if','implements','import','instanceof','int','interface','long','native','new','package','private','protected','public','return','short','static','strictfp','super','switch','synchronized','this','throw','throws','transient','try','void','volatile','while'];
+        for (const s of appId.split('.')) { if(reserved.includes(s)) return `予約語「${s}」は使えません`; }
+        return null;
+    }
+
+    function exportZip() {
+        const appId = document.getElementById('appId').value || 'com.example.app';
+        const err = validateAppId(appId);
+        if (err) { log(err,"err"); return alert(err); }
+        const zip = new JSZip();
+        const ktPath = `app/src/main/java/${appId.replace(/\./g,'/')}/`;
+        files.forEach(f => { zip.file(f.name.endsWith('.kt') ? ktPath+f.name : `app/src/main/assets/${f.name}`, f.content); });
+        zip.generateAsync({type:'blob'}).then(blob => {
+            const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='android-project.zip'; a.click();
+            setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+            log("ZIPダウンロード完了","suc");
+        });
+    }
+
+    // ─── GitHub API ───
+    async function ghApi(path, method='GET', body=null) {
+        const token = document.getElementById('ghToken').value;
+        const repo = document.getElementById('repoSelect').value;
+        const url = path.startsWith('http') ? path : `https://api.github.com/repos/${repo}${path}`;
+        const res = await fetch(url, { method, headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github+json'}, body:body?JSON.stringify(body):null });
+        if (!res.ok) throw new Error(await res.text());
+        return res.status===204 ? null : res.json();
+    }
+    async function fetchRepos() {
+        const token = document.getElementById('ghToken').value; if(!token)return;
+        try {
+            log("リポジトリ取得中...");
+            const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated',{headers:{'Authorization':`token ${token}`}});
+            if(!res.ok) throw new Error(`GitHub API ${res.status}: トークンが無効か期限切れの可能性があります`);
+            const data = await res.json();
+            if(!Array.isArray(data)) throw new Error('予期しないレスポンス形式です');
+            const sel = document.getElementById('repoSelect');
+            sel.innerHTML='<option value="">選択...</option>';
+            data.forEach(r=>{const o=document.createElement('option');o.value=r.full_name;o.text=r.full_name;sel.appendChild(o);});
+            const saved = await dbGet('selected_repo'); if(saved) sel.value=saved;
+            log(`${data.length} 件のリポジトリを取得`,"suc");
+        } catch(e) { log("取得失敗: "+e.message,"err"); }
+    }
+
+    // ─── Deploy Dialog ───
+    document.getElementById('deployBtn').onclick = async () => {
+        const repo = document.getElementById('repoSelect').value;
+        if (!repo) return alert("設定画面でリポジトリを選択してください");
+        // Restore saved values
+        const savedName = await dbGet('app_name');
+        const savedId = await dbGet('app_id');
+        const savedBranch = await dbGet('branch_name');
+        if (savedName) document.getElementById('appName').value = savedName;
+        if (savedId) document.getElementById('appId').value = savedId;
+        if (savedBranch) document.getElementById('branchName').value = savedBranch;
+        document.getElementById('deployRepoName').textContent = repo;
+        document.getElementById('confirmDeployBtn').disabled = false;
+        document.getElementById('deployOverlay').classList.add('active');
+    };
+    function closeDeployDialog() { document.getElementById('deployOverlay').classList.remove('active'); }
+
+    // ─── Execute Deploy ───
+    async function executeDeploy() {
+        const appName = document.getElementById('appName').value || 'My App';
+        const appId = document.getElementById('appId').value || 'com.example.app';
+        const branch = document.getElementById('branchName').value.trim() || 'main';
+        const err = validateAppId(appId);
+        if (err) { log(err,"err"); return alert(err); }
+
+        // Save for next time
+        await dbSave('app_name', appName);
+        await dbSave('app_id', appId);
+        await dbSave('branch_name', branch);
+
+        document.getElementById('confirmDeployBtn').disabled = true;
+        closeDeployDialog();
+        openPipeline();
+        const repo = document.getElementById('repoSelect').value;
+
+        try {
+            document.getElementById('deployBtn').disabled = true;
+            log(`${repo} (${branch}) へデプロイ開始`);
+
+            // Step 1: Upload
+            setStep('upload','active','圧縮中...');
+            const zip = new JSZip();
+            files.filter(f=>!f.name.endsWith('.kt')).forEach(f=>zip.file(f.name,f.content));
+            const zipB64 = await zip.generateAsync({type:'base64'});
+            setStep('upload','active','送信中...');
+            let sha=null; try{sha=(await ghApi('/contents/www.zip')).sha;}catch(e){}
+            await ghApi('/contents/www.zip','PUT',{message:"chore: update web assets",content:zipB64,sha});
+            setStep('upload','done','完了'); log("www.zip アップロード完了");
+
+            // Step 2: Commit .kt
+            const ktFiles = files.filter(f=>f.name.endsWith('.kt'));
+            const ktBase = `app/src/main/java/${appId.replace(/\./g,'/')}`;
+            if (ktFiles.length > 0) {
+                setStep('commit','active',`0/${ktFiles.length}`);
+                for(let i=0;i<ktFiles.length;i++){
+                    const f=ktFiles[i]; const rp=`/contents/${ktBase}/${f.name}`;
+                    let ks=null; try{ks=(await ghApi(rp)).sha;}catch(e){}
+                    await ghApi(rp,'PUT',{message:`chore: update ${f.name}`,content:btoa(unescape(encodeURIComponent(f.content))),sha:ks});
+                    setStep('commit','active',`${i+1}/${ktFiles.length}`); log(`${f.name} コミット完了`);
+                }
+            }
+            setStep('commit','done',`${ktFiles.length} files`);
+
+            // Step 3: Trigger
+            setStep('trigger','active','dispatch...');
+            await ghApi('/actions/workflows/build-apk.yml/dispatches','POST',{ref:branch,inputs:{app_name:appName,app_id:appId}});
+            setStep('trigger','done',branch); log("ビルドトリガー完了","suc");
+
+            // Step 4: Get Run ID
+            setStep('build','active','Run取得中...');
+            await new Promise(r=>setTimeout(r,4000));
+            const runs = await ghApi('/actions/workflows/build-apk.yml/runs?per_page=1');
+            const runId = runs.workflow_runs[0]?.id;
+            if(!runId) throw new Error("Runが見つかりません");
+            setStep('build','active',`#${runId}`); log(`Run #${runId} 監視開始`);
+            startPolling(runId);
+
+        } catch(e) {
+            log("エラー: "+e.message,"err");
+            document.querySelectorAll('.pipeline-step.active').forEach(s=>setStep(s.dataset.step,'fail','エラー'));
+            document.getElementById('deployBtn').disabled=false; clearInterval(pipelineTimer);
+        }
+    }
+
+    // ─── Polling ───
+    function startPolling(runId) {
+        const MAX_POLLS=180, MAX_ERRORS=5;
+        let pollCount=0, errorCount=0;
+        // ポーリング開始時の認証情報を固定（途中の設定変更に影響されない）
+        const pollingToken = document.getElementById('ghToken').value;
+        const pollingRepo = document.getElementById('repoSelect').value;
+        const pollApi = async (path) => {
+            const url = `https://api.github.com/repos/${pollingRepo}${path}`;
+            const res = await fetch(url, { headers:{'Authorization':`token ${pollingToken}`,'Accept':'application/vnd.github+json'} });
+            if (!res.ok) throw new Error(await res.text());
+            return res.json();
+        };
+        const interval = setInterval(async()=>{
+            pollCount++;
+            if(pollCount>MAX_POLLS){ clearInterval(interval);clearInterval(pipelineTimer); document.getElementById('deployBtn').disabled=false; setStep('build','fail','タイムアウト'); log("30分タイムアウト","err"); return; }
+            try {
+                const run = await pollApi(`/actions/runs/${runId}`);
+                errorCount=0;
+                const sm={queued:'キュー中...',in_progress:'ビルド中...',completed:'完了'};
+                setStep('build','active',sm[run.status]||run.status);
+                log(`状態: ${run.status} (${run.conclusion||'実行中'})`);
+                if(run.status==='completed'){
+                    clearInterval(interval);clearInterval(pipelineTimer);
+                    document.getElementById('deployBtn').disabled=false;
+                    if(run.conclusion==='success'){ setStep('build','done','成功'); setStep('done','active','取得中...'); log("ビルド成功！","suc"); showDownload(runId, pollingToken, pollingRepo); }
+                    else { setStep('build','fail',run.conclusion); logWithLink(`ビルド失敗: ${run.conclusion}`,run.html_url,"err"); }
+                }
+            } catch(e){
+                errorCount++; log(`監視エラー (${errorCount}/${MAX_ERRORS}): ${e.message}`,"err");
+                if(errorCount>=MAX_ERRORS){ clearInterval(interval);clearInterval(pipelineTimer); document.getElementById('deployBtn').disabled=false; setStep('build','fail','通信エラー'); log("ポーリング中断","err"); }
+            }
+        },10000);
+    }
+
+    // ─── APK Download ───
+    async function showDownload(id, token, repo) {
+        // token/repo はポーリング開始時にキャプチャした値を使う（設定変更の影響を受けない）
+        token = token || document.getElementById('ghToken').value;
+        repo = repo || document.getElementById('repoSelect').value;
+        const dlApi = async (path) => {
+            const url = `https://api.github.com/repos/${repo}${path}`;
+            const res = await fetch(url, { headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github+json'} });
+            if (!res.ok) throw new Error(await res.text());
+            return res.json();
+        };
+        try {
+            const arts = await dlApi(`/actions/runs/${id}/artifacts`);
+            if(arts.artifacts.length===0){ setStep('done','fail','未検出'); log("Artifact無し","err"); return; }
+            setStep('done','done','Ready');
+            document.getElementById('downloadArea').style.display='block';
+            document.getElementById('downloadLink').onclick = async()=>{
+                try {
+                    log("ダウンロード中...");
+                    const res = await fetch(arts.artifacts[0].archive_download_url,{headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github+json'}});
+                    if(!res.ok) throw new Error('HTTP '+res.status);
+                    const blob=await res.blob(); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download="apk-bundle.zip"; a.click();
+                    setTimeout(()=>URL.revokeObjectURL(a.href),1000); log("ダウンロード完了","suc");
+                } catch(e) { log("自動DL失敗: "+e.message,"err"); logWithLink("手動でダウンロード →",`https://github.com/${repo}/actions/runs/${id}`,"err"); }
+            };
+        } catch(e){ log("Artifact取得エラー: "+e.message,"err"); setStep('done','fail','エラー'); }
+    }
+
+    // ─── Clear All ───
+    async function clearAllData() {
+        if(!confirm("すべてのデータを削除します。よろしいですか？"))return;
+        try {
+            const db=await getDB(); const tx=db.transaction(STORE_NAME,'readwrite'); tx.objectStore(STORE_NAME).clear();
+            tx.oncomplete=()=>{
+                files=[{name:'index.html',content:'<!DOCTYPE html>\n<html>\n<body>\n  <h1>Hello</h1>\n</body>\n</html>',active:true}];
+                document.getElementById('ghToken').value=''; document.getElementById('appName').value='My App';
+                document.getElementById('appId').value='com.example.app'; document.getElementById('branchName').value='main';
+                document.getElementById('repoSelect').innerHTML='<option value="">トークンを設定...</option>';
+                document.getElementById('activeRepoDisplay').textContent='未接続';
+                document.getElementById('downloadArea').style.display='none';
+                document.getElementById('logConsole').innerHTML=''; closePipeline(); renderTabs();
+                log("初期化完了","suc");
+            };
+        } catch(e){ log("初期化エラー: "+e.message,"err"); }
+    }
+
+    // ─── Settings ───
+    document.getElementById('openSettingsBtn').onclick = ()=>document.getElementById('settingsOverlay').classList.add('active');
+    function closeSettings() { document.getElementById('settingsOverlay').classList.remove('active'); }
+    document.getElementById('saveSettingsBtn').onclick = async()=>{
+        const r=document.getElementById('repoSelect').value;
+        await dbSave('gh_token',document.getElementById('ghToken').value);
+        await dbSave('selected_repo',r);
+        document.getElementById('activeRepoDisplay').textContent = r ? r.split('/')[1] : '未接続';
+        closeSettings();
+    };
+    document.getElementById('verifyTokenBtn').onclick = fetchRepos;
+
+    // ─── Init ───
+    window.onload = async()=>{
+        try {
+            files = await dbGet('files') || files;
+            document.getElementById('ghToken').value = await dbGet('gh_token') || '';
+            document.getElementById('appName').value = await dbGet('app_name') || 'My App';
+            document.getElementById('appId').value = await dbGet('app_id') || 'com.example.app';
+            document.getElementById('branchName').value = await dbGet('branch_name') || 'main';
+            const r = await dbGet('selected_repo');
+            if(r) document.getElementById('activeRepoDisplay').textContent = r.split('/')[1];
+            renderTabs();
+            if(document.getElementById('ghToken').value) fetchRepos();
+        } catch(e) { console.error('Init:',e); renderTabs(); log("データ読み込み失敗","err"); }
+    };
+</script>
+</body>
+</html>
