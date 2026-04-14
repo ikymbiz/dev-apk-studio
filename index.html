@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CloudIDE">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0d1117">
+    <link rel="icon" id="dynamicFavicon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0iIzBkMTExNyIvPjxwYXRoIGQ9Ik0yODAgOTBMMTQwIDI4MGgxMDBsLTQwIDE0MmwxNDAtMTkwSDI0MHoiIGZpbGw9IiNkMjk5MjIiLz48L3N2Zz4=">
+    <link rel="apple-touch-icon" id="dynamicAppleIcon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0iIzBkMTExNyIvPjxwYXRoIGQ9Ik0yODAgOTBMMTQwIDI4MGgxMDBsLTQwIDE0MmwxNDAtMTkwSDI0MHoiIGZpbGw9IiNkMjk5MjIiLz48L3N2Zz4=">
     <title>⚡ Cloud IDE Ultra+</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- CodeMirror -->
@@ -31,8 +36,25 @@
             --safe-bottom: env(safe-area-inset-bottom, 0px);
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html { height: 100%; }
-        body { font-family: 'Noto Sans JP', sans-serif; margin: 0; background: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; touch-action: manipulation; }
+        html { height: 100%; overscroll-behavior: none; }
+        body { font-family: 'Noto Sans JP', sans-serif; margin: 0; background: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; touch-action: manipulation; overscroll-behavior: none; }
+
+        /* ── AI Provider Section (Settings) ── */
+        .ai-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+        .ai-section-title { font-size: 12px; font-weight: 700; color: var(--text-bright); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        details.provider-block { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+        details.provider-block[open] { border-color: var(--primary-dim); }
+        details.provider-block summary { padding: 12px 14px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-bright); list-style: none; display: flex; align-items: center; justify-content: space-between; user-select: none; -webkit-user-select: none; min-height: 44px; }
+        details.provider-block summary::-webkit-details-marker { display: none; }
+        details.provider-block summary::after { content: '▼'; font-size: 9px; color: var(--text-muted); transition: transform 0.2s; }
+        details.provider-block[open] summary::after { transform: rotate(180deg); }
+        details.provider-block .provider-body { padding: 4px 14px 14px; border-top: 1px solid var(--border); }
+        .provider-badge-active { font-size: 9px; background: var(--success-dim); color: var(--success); padding: 2px 8px; border-radius: 10px; margin-left: 8px; border: 1px solid var(--success); }
+        .icon-preview { width: 96px; height: 96px; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; margin: 8px auto; overflow: hidden; }
+        .icon-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .icon-preview .icon-empty { font-size: 10px; color: var(--text-muted); text-align: center; padding: 8px; }
+        .ai-hint { font-size: 10px; color: var(--text-muted); padding: 6px 0 0; line-height: 1.5; }
+        #importInput { display: none; }
 
         /* ── Header (merged with toolbar) ── */
         header { display: flex; align-items: center; gap: 5px; padding: 0 8px; padding-top: var(--safe-top); min-height: 44px; background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -134,6 +156,9 @@
 <header>
     <span class="logo">⚡ IDE</span>
     <button class="btn-ghost btn-sm" onclick="exportZip()">📦</button>
+    <button class="btn-ghost btn-sm" id="importBtn" title="インポート" onclick="document.getElementById('importInput').click()">📥</button>
+    <button class="btn-ghost btn-sm" id="translateBtn" title="AI Kotlin翻訳" onclick="translateToKotlin()">🤖</button>
+    <input type="file" id="importInput" multiple accept=".html,.htm,.css,.js,.mjs,.json,.kt,.kts,.xml,.md,.txt,.zip" onchange="handleImport(this)">
     <span class="repo-badge" id="activeRepoDisplay">未接続</span>
     <div class="header-actions">
         <button class="btn-sm" id="deployBtn">🚀 デプロイ</button>
@@ -221,7 +246,37 @@
             <select id="repoSelect"><option value="">トークンを設定してください...</option></select>
         </div>
         <button id="saveSettingsBtn" class="btn-full" style="margin-bottom:16px;">💾 適用して閉じる</button>
-        <div style="padding-top:20px; border-top:1px solid var(--border);">
+
+        <div class="ai-section">
+            <div class="ai-section-title">🤖 AI Provider</div>
+            <div class="field-group">
+                <label>アクティブプロバイダ</label>
+                <select id="activeProvider">
+                    <option value="claude">Claude (Anthropic)</option>
+                    <option value="openai">GPT (OpenAI)</option>
+                    <option value="gemini">Gemini (Google)</option>
+                    <option value="xai">Grok (xAI)</option>
+                </select>
+                <div class="hint">Kotlin翻訳に使用するAIを選択</div>
+            </div>
+            <div id="providerBlocks"></div>
+        </div>
+
+        <div class="ai-section">
+            <div class="ai-section-title">🎨 アイコン生成 (Gemini)</div>
+            <div class="field-group">
+                <label>画像生成モデル</label>
+                <select id="iconModel"></select>
+            </div>
+            <div class="icon-preview" id="iconPreview">
+                <div class="icon-empty">未生成</div>
+            </div>
+            <button class="btn-ghost btn-full" id="generateIconBtn" onclick="generateIcon()" style="margin-top:8px;">🎨 アイコンを生成</button>
+            <button class="btn-ghost btn-full" id="resetIconBtn" onclick="resetIcon()" style="margin-top:8px;">↺ デフォルトに戻す</button>
+            <div class="ai-hint">Geminiの画像生成APIを使用します。GeminiのAPIキーが必要です。</div>
+        </div>
+
+        <div style="padding-top:20px; margin-top:20px; border-top:1px solid var(--border);">
             <button class="btn-danger btn-full" onclick="clearAllData()">🗑 データを初期化</button>
         </div>
     </div>
@@ -233,6 +288,328 @@
     let editors = {};  // filename → CodeMirror instance
     const DB_NAME = 'UltraPlus_DB';
     const STORE_NAME = 'settings';
+
+    // ─── AI Provider Configuration ───
+    let isTranslating = false;
+    let isGeneratingIcon = false;
+
+    const AI_MODELS = {
+        claude: {
+            name: "Claude (Anthropic)",
+            endpoint: "https://api.anthropic.com/v1/messages",
+            models: [
+                { id: "claude-opus-4-6", label: "Claude Opus 4.6 (最高精度)" },
+                { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (推奨)" },
+                { id: "claude-haiku-4-5", label: "Claude Haiku 4.5 (高速)" }
+            ],
+            default: "claude-sonnet-4-6"
+        },
+        openai: {
+            name: "GPT (OpenAI)",
+            endpoint: "https://api.openai.com/v1/chat/completions",
+            models: [
+                { id: "gpt-4o", label: "GPT-4o (推奨)" },
+                { id: "gpt-4o-mini", label: "GPT-4o mini (高速)" },
+                { id: "o1", label: "o1 (推論特化)" },
+                { id: "o1-mini", label: "o1-mini" }
+            ],
+            default: "gpt-4o"
+        },
+        gemini: {
+            name: "Gemini (Google)",
+            endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
+            models: [
+                { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (最高精度)" },
+                { id: "gemini-3-flash-preview", label: "Gemini 3 Flash (推奨)" },
+                { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+                { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }
+            ],
+            default: "gemini-3-flash-preview"
+        },
+        xai: {
+            name: "Grok (xAI)",
+            endpoint: "https://api.x.ai/v1/chat/completions",
+            models: [
+                { id: "grok-2-latest", label: "Grok 2 (推奨)" },
+                { id: "grok-2-mini", label: "Grok 2 mini" },
+                { id: "grok-beta", label: "Grok Beta" }
+            ],
+            default: "grok-2-latest"
+        }
+    };
+
+    const AI_IMAGE_MODELS = {
+        gemini: {
+            name: "Gemini Image",
+            endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
+            models: [
+                { id: "gemini-3.1-flash-image-preview", label: "Gemini 3.1 Flash Image (推奨)" },
+                { id: "gemini-3-pro-image-preview", label: "Gemini 3 Pro Image (最高品質)" },
+                { id: "gemini-2.5-flash-image", label: "Gemini 2.5 Flash Image (旧世代)" }
+            ],
+            default: "gemini-3.1-flash-image-preview"
+        }
+    };
+
+    const KOTLIN_TRANSLATION_PROMPT = `あなたはAndroidネイティブ開発の専門家です。
+提供されるHTML/CSS/JavaScriptのUIを、Android Native (Kotlin) の MainActivity.kt に変換してください。
+
+厳守事項:
+1. WebViewは絶対に使わない
+2. UI構築はXMLレイアウトファイルを使わず、setContentViewにLinearLayout/ConstraintLayout/TextView/Button/EditTextをコードのみでプログラマティックに構築する単一ファイル構成にする
+3. JavaScriptのイベントハンドラはsetOnClickListenerなどに変換
+4. 非同期処理はKotlin Coroutines (lifecycleScope.launch)
+5. アラートはToast.makeText
+6. fetch等のHTTPはOkHttpではなくjava.net.HttpURLConnectionで記述（依存追加不要にするため）
+7. パッケージ名は com.example.app
+8. 出力はMainActivity.ktの中身のみ。説明文・マークダウン記法・コードフェンス(\`\`\`)は一切含めない
+9. importは必要なものをすべて記載
+10. コメントは日本語で簡潔に
+11. MainActivityは AppCompatActivity を継承すること
+
+【コンパイル可能性に関する絶対ルール】
+A. 使用可能な依存は以下のみ。これ以外のライブラリのimportは絶対に書かない:
+   - androidx.appcompat.*
+   - androidx.core.*
+   - androidx.constraintlayout.widget.*
+   - androidx.lifecycle.* (lifecycleScope含む)
+   - com.google.android.material.*
+   - kotlinx.coroutines.*
+   - android.* (標準フレームワーク全般)
+   - java.* / kotlin.* (標準ライブラリ)
+B. Jetpack Composeは使用禁止。androidx.compose.* のimportは一切書かない
+C. \`.dp\` 拡張プロパティ（16.dp など）は使用禁止。代わりに以下のいずれかを使う:
+   - 自前で \`private fun Int.dp(): Int = (this * resources.displayMetrics.density).toInt()\` を MainActivity 内に定義して \`16.dp()\` のように呼び出す
+   - または TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics).toInt() を直接使う
+D. 未定義の関数やプロパティを呼び出さない。使用するヘルパー関数はすべてMainActivity内に定義すること
+E. SharedPreferencesを使う場合は getSharedPreferences() を直接呼ぶこと。loadFromPrefs()のような自作関数を呼ぶならその定義もコードに含めること
+F. コードは必ず最後まで完結させること。途中で省略したり「// 省略」「// TODO」などのプレースホルダを残さない
+G. 出力が長くなりすぎる場合はUIを簡略化してでも、構文的に完結した（全ての波括弧・丸括弧が閉じた）コードを出力する
+H. 生成後、頭の中で一度全体の波括弧の開閉を数えて、全ての { に対応する } があることを確認してから出力する`;
+
+    const ICON_GENERATION_PROMPT = `A minimal app icon for a mobile cloud development IDE.
+Dark background color #0d1117. Centered geometric symbol: a stylized lightning bolt
+combined with curly braces. Flat design, vibrant cyan and yellow accent colors,
+no text, no letters, square 1:1 aspect ratio, suitable for mobile app icon.`;
+
+    const DEFAULT_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#0d1117"/><path d="M280 90L140 280h100l-40 142l140-190H240z" fill="#d29922"/></svg>`;
+
+    // ─── GitHub Actions Workflow YAML (self-contained Android build) ───
+    // リポジトリの状態に関係なく動作する自己完結型ワークフロー。
+    // /tmp にAndroidプロジェクトを生成し、MainActivity.ktを配置してビルドする。
+    const BUILD_APK_YML = `name: Build APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'App display name'
+        required: false
+        type: string
+        default: 'My App'
+      app_id:
+        description: 'Application ID (package name)'
+        required: false
+        type: string
+        default: 'com.example.app'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Locate MainActivity.kt in repository
+        id: locate_kt
+        run: |
+          set -e
+          KT_PATH=\$(find . -type f -name 'MainActivity.kt' ! -path './.git/*' ! -path './build/*' ! -path './.gradle/*' | head -n 1)
+          if [ -z "\$KT_PATH" ]; then
+            echo "::error::MainActivity.kt がリポジトリに見つかりません。IDEの 🤖 ボタンで Kotlin 翻訳を実行してからデプロイしてください。"
+            exit 1
+          fi
+          echo "Found MainActivity.kt at: \$KT_PATH"
+          echo "kt_path=\$KT_PATH" >> "\$GITHUB_OUTPUT"
+
+      - name: Generate Android project scaffold
+        env:
+          APP_NAME: \${{ inputs.app_name }}
+          APP_ID: \${{ inputs.app_id }}
+          KT_SOURCE: \${{ steps.locate_kt.outputs.kt_path }}
+        run: |
+          set -e
+          PROJ=/tmp/androidproj
+          mkdir -p "\$PROJ"
+          cd "\$PROJ"
+
+          # パッケージディレクトリ
+          PKG_DIR=\$(echo "\$APP_ID" | tr '.' '/')
+          mkdir -p "app/src/main/java/\$PKG_DIR"
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/mipmap-anydpi-v26
+
+          # MainActivity.kt をコピー（パッケージ宣言を書き換え）
+          SRC_KT="\$GITHUB_WORKSPACE/\$KT_SOURCE"
+          DEST_KT="app/src/main/java/\$PKG_DIR/MainActivity.kt"
+          # 既存の package 宣言を置換、なければ先頭に追加
+          if head -n 1 "\$SRC_KT" | grep -q '^package '; then
+            sed "1s|^package .*|package \$APP_ID|" "\$SRC_KT" > "\$DEST_KT"
+          else
+            echo "package \$APP_ID" > "\$DEST_KT"
+            echo "" >> "\$DEST_KT"
+            cat "\$SRC_KT" >> "\$DEST_KT"
+          fi
+          echo "=== MainActivity.kt (head) ==="
+          head -n 20 "\$DEST_KT"
+
+          # settings.gradle
+          cat > settings.gradle <<'SETTINGS'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "GeneratedApp"
+          include ':app'
+          SETTINGS
+
+          # build.gradle (root)
+          cat > build.gradle <<'ROOTGRADLE'
+          plugins {
+              id 'com.android.application' version '8.2.2' apply false
+              id 'org.jetbrains.kotlin.android' version '1.9.22' apply false
+          }
+          ROOTGRADLE
+
+          # app/build.gradle
+          cat > app/build.gradle <<APPGRADLE
+          plugins {
+              id 'com.android.application'
+              id 'org.jetbrains.kotlin.android'
+          }
+
+          android {
+              namespace '\$APP_ID'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "\$APP_ID"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+                  debug {
+                      minifyEnabled false
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.core:core-ktx:1.12.0'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
+              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+              implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+              implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+          }
+          APPGRADLE
+
+          # AndroidManifest.xml
+          cat > app/src/main/AndroidManifest.xml <<'MANIFEST'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="true"
+                  android:label="@string/app_name"
+                  android:theme="@style/Theme.App"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          MANIFEST
+
+          # strings.xml
+          cat > app/src/main/res/values/strings.xml <<STRINGS
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">\$APP_NAME</string>
+          </resources>
+          STRINGS
+
+          # themes.xml
+          cat > app/src/main/res/values/themes.xml <<'THEMES'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="Theme.App" parent="Theme.Material3.DayNight.NoActionBar" />
+          </resources>
+          THEMES
+
+          # gradle.properties
+          cat > gradle.properties <<'GRADLEPROPS'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          android.nonTransitiveRClass=true
+          GRADLEPROPS
+
+          echo "=== Generated project structure ==="
+          find . -type f | sort
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build debug APK
+        working-directory: /tmp/androidproj
+        run: |
+          gradle wrapper --gradle-version 8.5
+          ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: /tmp/androidproj/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+`;
 
     // ─── DB (cached, error-safe) ───
     let _dbCache = null;
@@ -535,6 +912,19 @@
             await ghApi('/contents/www.zip','PUT',{message:"chore: update web assets",content:zipB64,sha});
             setStep('upload','done','完了'); log("www.zip アップロード完了");
 
+            // Step 1.5: Commit build-apk.yml (自己完結型ワークフロー)
+            log("build-apk.yml をコミット中...");
+            const ymlPath = '/contents/.github/workflows/build-apk.yml';
+            let ymlSha = null;
+            try { ymlSha = (await ghApi(ymlPath)).sha; } catch(e) {}
+            const ymlB64 = btoa(unescape(encodeURIComponent(BUILD_APK_YML)));
+            await ghApi(ymlPath, 'PUT', {
+                message: "chore: update build-apk.yml workflow",
+                content: ymlB64,
+                sha: ymlSha
+            });
+            log("build-apk.yml コミット完了", "suc");
+
             // Step 2: Commit .kt
             const ktFiles = files.filter(f=>f.name.endsWith('.kt'));
             const ktBase = `app/src/main/java/${appId.replace(/\./g,'/')}`;
@@ -646,19 +1036,665 @@
                 document.getElementById('activeRepoDisplay').textContent='未接続';
                 document.getElementById('downloadArea').style.display='none';
                 document.getElementById('logConsole').innerHTML=''; closePipeline(); renderTabs();
+                buildAISettingsUI();
                 log("初期化完了","suc");
             };
         } catch(e){ log("初期化エラー: "+e.message,"err"); }
     }
 
+    // ════════════════════════════════════════════════════════════
+    // ─── ZIP Import Feature ───
+    // ════════════════════════════════════════════════════════════
+    const ALLOWED_EXTENSIONS = ['html','htm','css','js','mjs','json','kt','kts','xml','svg','md','txt','java','gradle','properties','yml','yaml'];
+    const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+
+    function isAllowedExtension(name) {
+        const ext = name.split('.').pop().toLowerCase();
+        return ALLOWED_EXTENSIONS.includes(ext);
+    }
+
+    function sanitizeImportPath(path) {
+        // 先頭スラッシュ除去
+        let clean = path.replace(/^\/+/, '');
+        // 危険な文字を除去（パストラバーサル防止）
+        clean = clean.replace(/\.\./g, '_');
+        // 許可：英数字、._-/、日本語
+        clean = clean.replace(/[^a-zA-Z0-9._\-\/\u3040-\u309f\u30a0-\u30ff\u4e00-\u9fff]/g, '_');
+        if (!clean || clean === '.' || clean === '..') return null;
+        return clean;
+    }
+
+    function addImportedFile(name, content, stats) {
+        if (files.some(f => f.name === name)) {
+            stats.skipped++;
+            stats.skippedReasons.push(`${name} (重複)`);
+            return;
+        }
+        files.push({ name, content, active: false });
+        stats.added++;
+    }
+
+    async function processSingleFile(file, stats) {
+        if (file.size > MAX_FILE_SIZE) {
+            stats.skipped++;
+            stats.skippedReasons.push(`${file.name} (1MB超過)`);
+            return;
+        }
+        if (!isAllowedExtension(file.name)) {
+            stats.skipped++;
+            stats.skippedReasons.push(`${file.name} (拡張子非対応)`);
+            return;
+        }
+        const cleanName = sanitizeImportPath(file.name);
+        if (!cleanName) {
+            stats.skipped++;
+            stats.skippedReasons.push(`${file.name} (名前不正)`);
+            return;
+        }
+        try {
+            const content = await file.text();
+            addImportedFile(cleanName, content, stats);
+        } catch (e) {
+            stats.skipped++;
+            stats.skippedReasons.push(`${file.name} (読込失敗)`);
+        }
+    }
+
+    async function processZipFile(file, stats) {
+        try {
+            const zip = await JSZip.loadAsync(file);
+            const entries = [];
+            zip.forEach((path, entry) => entries.push({ path, entry }));
+            for (const { path, entry } of entries) {
+                if (entry.dir) continue;
+                // macOS / 隠しファイル除外
+                if (path.startsWith('__MACOSX/') || path.includes('/.DS_Store') || path.endsWith('.DS_Store')) continue;
+                const baseName = path.split('/').pop();
+                if (baseName.startsWith('.')) continue;
+                if (!isAllowedExtension(path)) {
+                    stats.skipped++;
+                    stats.skippedReasons.push(`${path} (拡張子非対応)`);
+                    continue;
+                }
+                const cleanPath = sanitizeImportPath(path);
+                if (!cleanPath) {
+                    stats.skipped++;
+                    stats.skippedReasons.push(`${path} (名前不正)`);
+                    continue;
+                }
+                try {
+                    const content = await entry.async("string");
+                    if (content.length > MAX_FILE_SIZE) {
+                        stats.skipped++;
+                        stats.skippedReasons.push(`${path} (1MB超過)`);
+                        continue;
+                    }
+                    addImportedFile(cleanPath, content, stats);
+                } catch (e) {
+                    stats.skipped++;
+                    stats.skippedReasons.push(`${path} (展開失敗)`);
+                }
+            }
+        } catch (e) {
+            log(`ZIP展開エラー (${file.name}): ${e.message}`, "err");
+        }
+    }
+
+    async function handleImport(input) {
+        const filesArray = Array.from(input.files);
+        if (filesArray.length === 0) return;
+        const stats = { added: 0, skipped: 0, skippedReasons: [] };
+        log(`インポート開始: ${filesArray.length} 個の項目`);
+        for (const file of filesArray) {
+            if (file.name.toLowerCase().endsWith('.zip')) {
+                await processZipFile(file, stats);
+            } else {
+                await processSingleFile(file, stats);
+            }
+        }
+        if (stats.added > 0) {
+            renderTabs();
+            await dbSave('files', files);
+        }
+        const msg = `インポート完了: 取込${stats.added}件 / スキップ${stats.skipped}件`;
+        log(msg, stats.added > 0 ? "suc" : "");
+        if (stats.skippedReasons.length > 0 && stats.skippedReasons.length <= 10) {
+            stats.skippedReasons.forEach(r => log(`  skip: ${r}`));
+        } else if (stats.skippedReasons.length > 10) {
+            stats.skippedReasons.slice(0, 10).forEach(r => log(`  skip: ${r}`));
+            log(`  ...他 ${stats.skippedReasons.length - 10} 件`);
+        }
+        input.value = ''; // 同じファイルを再選択可能にする
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // ─── Multi-AI Provider Adapters ───
+    // ════════════════════════════════════════════════════════════
+    function stripCodeFence(text) {
+        if (!text) return '';
+        let t = text.trim();
+        // 先頭 ```kotlin or ``` を除去
+        t = t.replace(/^```(?:kotlin|kt|java)?\s*\n?/i, '');
+        // 末尾 ``` を除去
+        t = t.replace(/\n?```\s*$/i, '');
+        return t.trim();
+    }
+
+    async function callClaude(key, model, sys, user) {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true',
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: model,
+                max_tokens: 32000,
+                system: sys,
+                messages: [{ role: 'user', content: user }]
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(`[Claude] ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+        }
+        if (!data.content || !data.content[0]) {
+            throw new Error('[Claude] 応答が空です');
+        }
+        return data.content[0].text;
+    }
+
+    async function callOpenAI(key, model, sys, user) {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: model,
+                max_tokens: 32000,
+                messages: [
+                    { role: 'system', content: sys },
+                    { role: 'user', content: user }
+                ]
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(`[OpenAI] ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+        }
+        if (!data.choices || !data.choices[0]) {
+            throw new Error('[OpenAI] 応答が空です');
+        }
+        return data.choices[0].message.content;
+    }
+
+    async function callGemini(key, model, sys, user) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                system_instruction: { parts: [{ text: sys }] },
+                contents: [{ role: 'user', parts: [{ text: user }] }],
+                generationConfig: { temperature: 0.2, maxOutputTokens: 32000 }
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(`[Gemini] ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+        }
+        if (!data.candidates || !data.candidates[0]) {
+            throw new Error('[Gemini] AIが応答を拒否しました（safety blockの可能性）');
+        }
+        const parts = data.candidates[0].content?.parts || [];
+        const textPart = parts.find(p => p.text);
+        if (!textPart) throw new Error('[Gemini] テキスト応答がありません');
+        return textPart.text;
+    }
+
+    async function callXai(key, model, sys, user) {
+        const res = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: model,
+                max_tokens: 32000,
+                messages: [
+                    { role: 'system', content: sys },
+                    { role: 'user', content: user }
+                ]
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(`[xAI] ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+        }
+        if (!data.choices || !data.choices[0]) {
+            throw new Error('[xAI] 応答が空です');
+        }
+        return data.choices[0].message.content;
+    }
+
+    async function callAI(provider, key, model, sys, user) {
+        switch (provider) {
+            case 'claude': return await callClaude(key, model, sys, user);
+            case 'openai': return await callOpenAI(key, model, sys, user);
+            case 'gemini': return await callGemini(key, model, sys, user);
+            case 'xai':    return await callXai(key, model, sys, user);
+            default: throw new Error(`未知のプロバイダ: ${provider}`);
+        }
+    }
+
+    function upsertKotlinFile(content) {
+        const existing = files.findIndex(f => f.name === 'MainActivity.kt');
+        if (existing >= 0) {
+            files[existing].content = content;
+            files.forEach((f, i) => f.active = (i === existing));
+        } else {
+            files.forEach(f => f.active = false);
+            files.push({ name: 'MainActivity.kt', content, active: true });
+        }
+    }
+
+    async function translateToKotlin() {
+        if (isTranslating) {
+            log("翻訳処理が既に実行中です", "err");
+            return;
+        }
+        // アクティブプロバイダ取得
+        const provider = await dbGet('ai_provider') || 'claude';
+        const key = await dbGet(`apiKey_${provider}`);
+        if (!key) {
+            log(`${AI_MODELS[provider].name} のAPIキーが未設定です。設定画面を開きます`, "err");
+            document.getElementById('settingsOverlay').classList.add('active');
+            return;
+        }
+        const model = (await dbGet(`model_${provider}`)) || AI_MODELS[provider].default;
+
+        // index.html取得
+        const htmlFile = files.find(f => f.name === 'index.html');
+        if (!htmlFile) {
+            log("index.html が見つかりません", "err");
+            return;
+        }
+
+        isTranslating = true;
+        const btn = document.getElementById('translateBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳';
+        openPipeline();
+        setStep('trigger', 'active', `${provider} 翻訳中...`);
+        log(`${AI_MODELS[provider].name} (${model}) で翻訳開始`);
+
+        try {
+            const userPrompt = `以下のHTMLをMainActivity.ktに変換してください:\n\n${htmlFile.content}`;
+            const result = await callAI(provider, key, model, KOTLIN_TRANSLATION_PROMPT, userPrompt);
+            const kotlinCode = stripCodeFence(result);
+            if (!kotlinCode || kotlinCode.length < 50) {
+                throw new Error('生成されたコードが短すぎます');
+            }
+            upsertKotlinFile(kotlinCode);
+            renderTabs();
+            await dbSave('files', files);
+            setStep('trigger', 'done', 'AI翻訳完了');
+            log("MainActivity.kt を生成しました", "suc");
+        } catch (e) {
+            setStep('trigger', 'fail', 'エラー');
+            log(`翻訳エラー: ${e.message}`, "err");
+        } finally {
+            isTranslating = false;
+            btn.disabled = false;
+            btn.textContent = '🤖';
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // ─── Icon Generation (Gemini Image) ───
+    // ════════════════════════════════════════════════════════════
+    async function generateIconWithGemini(apiKey, model) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const body = {
+            contents: [{ role: "user", parts: [{ text: ICON_GENERATION_PROMPT }] }],
+            generationConfig: { responseModalities: ["IMAGE"] }
+        };
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`[Gemini Image] ${res.status}: ${errText.slice(0, 200)}`);
+        }
+        const data = await res.json();
+        if (!data.candidates || !data.candidates[0]) {
+            throw new Error('[Gemini Image] AIが応答を拒否しました');
+        }
+        const parts = data.candidates[0].content?.parts || [];
+        const imagePart = parts.find(p => p.inlineData && p.inlineData.data);
+        if (!imagePart) {
+            throw new Error('[Gemini Image] 画像が返却されませんでした');
+        }
+        const mime = imagePart.inlineData.mimeType || 'image/png';
+        return `data:${mime};base64,${imagePart.inlineData.data}`;
+    }
+
+    function applyCustomIcon(dataUrl) {
+        const fav = document.getElementById('dynamicFavicon');
+        const apple = document.getElementById('dynamicAppleIcon');
+        if (fav) fav.href = dataUrl;
+        if (apple) apple.href = dataUrl;
+        // manifest再構築
+        initPWA(dataUrl);
+        // プレビュー更新
+        const preview = document.getElementById('iconPreview');
+        if (preview) {
+            preview.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = dataUrl;
+            preview.appendChild(img);
+        }
+    }
+
+    async function generateIcon() {
+        if (isGeneratingIcon) {
+            log("アイコン生成処理が既に実行中です", "err");
+            return;
+        }
+        const geminiKey = await dbGet('apiKey_gemini');
+        if (!geminiKey) {
+            log("Gemini APIキーが未設定です。設定画面のGemini項目を開きます", "err");
+            // Geminiセクションを自動展開
+            const block = document.querySelector('details.provider-block[data-provider="gemini"]');
+            if (block) block.open = true;
+            return;
+        }
+        const model = document.getElementById('iconModel').value || AI_IMAGE_MODELS.gemini.default;
+
+        isGeneratingIcon = true;
+        const btn = document.getElementById('generateIconBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ 生成中...';
+        log(`アイコン生成開始: ${model}`);
+
+        try {
+            const dataUrl = await generateIconWithGemini(geminiKey, model);
+            await dbSave('customIcon', dataUrl);
+            applyCustomIcon(dataUrl);
+            log("アイコン生成完了", "suc");
+        } catch (e) {
+            log(`アイコン生成エラー: ${e.message}`, "err");
+        } finally {
+            isGeneratingIcon = false;
+            btn.disabled = false;
+            btn.textContent = '🎨 アイコンを生成';
+        }
+    }
+
+    async function resetIcon() {
+        if (!confirm("アイコンをデフォルトに戻しますか？")) return;
+        await dbSave('customIcon', null);
+        const defaultDataUrl = 'data:image/svg+xml;base64,' + btoa(DEFAULT_ICON_SVG);
+        applyCustomIcon(defaultDataUrl);
+        const preview = document.getElementById('iconPreview');
+        if (preview) {
+            preview.innerHTML = '<div class="icon-empty">デフォルト</div>';
+        }
+        log("アイコンをデフォルトに戻しました", "suc");
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // ─── PWA (Manifest dynamic injection) ───
+    // ════════════════════════════════════════════════════════════
+    let _manifestBlobUrl = null;
+    function buildManifest(iconDataUrl) {
+        return {
+            name: "Cloud IDE Ultra+",
+            short_name: "CloudIDE",
+            description: "Mobile-first cloud IDE for Android APK builds",
+            start_url: ".",
+            display: "standalone",
+            orientation: "any",
+            background_color: "#0d1117",
+            theme_color: "#0d1117",
+            icons: [
+                {
+                    src: iconDataUrl,
+                    sizes: "any",
+                    type: iconDataUrl.startsWith('data:image/svg') ? "image/svg+xml" : "image/png",
+                    purpose: "any maskable"
+                }
+            ]
+        };
+    }
+
+    function initPWA(iconDataUrl) {
+        try {
+            if (!iconDataUrl) {
+                iconDataUrl = 'data:image/svg+xml;base64,' + btoa(DEFAULT_ICON_SVG);
+            }
+            const manifest = buildManifest(iconDataUrl);
+            const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+            // 古いBlob URLを破棄
+            if (_manifestBlobUrl) {
+                URL.revokeObjectURL(_manifestBlobUrl);
+            }
+            _manifestBlobUrl = URL.createObjectURL(blob);
+            // 既存のmanifest linkを探す or 作成
+            let link = document.querySelector('link[rel="manifest"]');
+            if (!link) {
+                link = document.createElement('link');
+                link.rel = 'manifest';
+                document.head.appendChild(link);
+            }
+            link.href = _manifestBlobUrl;
+        } catch (e) {
+            console.error('PWA init error:', e);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // ─── Settings UI Builder (AI Providers) ───
+    // ════════════════════════════════════════════════════════════
+    async function buildAISettingsUI() {
+        const container = document.getElementById('providerBlocks');
+        if (!container) return;
+        const activeProvider = (await dbGet('ai_provider')) || 'claude';
+        document.getElementById('activeProvider').value = activeProvider;
+
+        container.innerHTML = '';
+        for (const [pid, cfg] of Object.entries(AI_MODELS)) {
+            const savedKey = (await dbGet(`apiKey_${pid}`)) || '';
+            const savedModel = (await dbGet(`model_${pid}`)) || cfg.default;
+
+            const details = document.createElement('details');
+            details.className = 'provider-block';
+            details.dataset.provider = pid;
+            if (pid === activeProvider) details.open = true;
+
+            const summary = document.createElement('summary');
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = cfg.name;
+            summary.appendChild(titleSpan);
+            if (pid === activeProvider) {
+                const badge = document.createElement('span');
+                badge.className = 'provider-badge-active';
+                badge.textContent = 'ACTIVE';
+                summary.appendChild(badge);
+            }
+            details.appendChild(summary);
+
+            const body = document.createElement('div');
+            body.className = 'provider-body';
+
+            // API Key field
+            const keyGroup = document.createElement('div');
+            keyGroup.className = 'field-group';
+            keyGroup.style.marginTop = '12px';
+            const keyLabel = document.createElement('label');
+            keyLabel.textContent = 'API Key';
+            const keyInput = document.createElement('input');
+            keyInput.type = 'password';
+            keyInput.id = `apiKeyInput_${pid}`;
+            keyInput.value = savedKey;
+            keyInput.autocapitalize = 'none';
+            keyInput.autocorrect = 'off';
+            keyInput.spellcheck = false;
+            keyInput.placeholder = pid === 'claude' ? 'sk-ant-...' :
+                                   pid === 'openai' ? 'sk-...' :
+                                   pid === 'gemini' ? 'AIza...' : 'xai-...';
+            keyGroup.appendChild(keyLabel);
+            keyGroup.appendChild(keyInput);
+            body.appendChild(keyGroup);
+
+            // Model select
+            const modelGroup = document.createElement('div');
+            modelGroup.className = 'field-group';
+            const modelLabel = document.createElement('label');
+            modelLabel.textContent = 'Model';
+            const modelSelect = document.createElement('select');
+            modelSelect.id = `modelSelect_${pid}`;
+            cfg.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.label;
+                if (m.id === savedModel) opt.selected = true;
+                modelSelect.appendChild(opt);
+            });
+            modelGroup.appendChild(modelLabel);
+            modelGroup.appendChild(modelSelect);
+            body.appendChild(modelGroup);
+
+            details.appendChild(body);
+            container.appendChild(details);
+        }
+
+        // Icon model select
+        const iconSelect = document.getElementById('iconModel');
+        if (iconSelect) {
+            iconSelect.innerHTML = '';
+            const savedIconModel = (await dbGet('iconModel')) || AI_IMAGE_MODELS.gemini.default;
+            AI_IMAGE_MODELS.gemini.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.label;
+                if (m.id === savedIconModel) opt.selected = true;
+                iconSelect.appendChild(opt);
+            });
+        }
+
+        // Icon preview
+        const customIcon = await dbGet('customIcon');
+        const preview = document.getElementById('iconPreview');
+        if (preview) {
+            preview.innerHTML = '';
+            if (customIcon) {
+                const img = document.createElement('img');
+                img.src = customIcon;
+                preview.appendChild(img);
+            } else {
+                const empty = document.createElement('div');
+                empty.className = 'icon-empty';
+                empty.textContent = 'デフォルト';
+                preview.appendChild(empty);
+            }
+        }
+    }
+
+    async function saveAISettings() {
+        const activeProvider = document.getElementById('activeProvider').value;
+        await dbSave('ai_provider', activeProvider);
+        for (const pid of Object.keys(AI_MODELS)) {
+            const keyEl = document.getElementById(`apiKeyInput_${pid}`);
+            const modelEl = document.getElementById(`modelSelect_${pid}`);
+            if (keyEl) await dbSave(`apiKey_${pid}`, keyEl.value);
+            if (modelEl) await dbSave(`model_${pid}`, modelEl.value);
+        }
+        const iconModelEl = document.getElementById('iconModel');
+        if (iconModelEl) await dbSave('iconModel', iconModelEl.value);
+    }
+
     // ─── Settings ───
-    document.getElementById('openSettingsBtn').onclick = ()=>document.getElementById('settingsOverlay').classList.add('active');
-    function closeSettings() { document.getElementById('settingsOverlay').classList.remove('active'); }
+    // ─── Settings dirty check ───
+    let _settingsSnapshot = null;
+    function captureSettingsSnapshot() {
+        const snap = {};
+        // GitHub 関連
+        snap.ghToken = document.getElementById('ghToken')?.value || '';
+        snap.repoSelect = document.getElementById('repoSelect')?.value || '';
+        // AI アクティブプロバイダ
+        snap.activeProvider = document.getElementById('activeProvider')?.value || '';
+        // 各プロバイダのキーとモデル
+        for (const pid of Object.keys(AI_MODELS)) {
+            const keyEl = document.getElementById(`apiKeyInput_${pid}`);
+            const modelEl = document.getElementById(`modelSelect_${pid}`);
+            if (keyEl) snap[`apiKey_${pid}`] = keyEl.value;
+            if (modelEl) snap[`model_${pid}`] = modelEl.value;
+        }
+        // アイコンモデル
+        snap.iconModel = document.getElementById('iconModel')?.value || '';
+        return snap;
+    }
+
+    function isSettingsDirty() {
+        if (!_settingsSnapshot) return false;
+        const current = captureSettingsSnapshot();
+        for (const key of Object.keys(current)) {
+            if (current[key] !== _settingsSnapshot[key]) return true;
+        }
+        for (const key of Object.keys(_settingsSnapshot)) {
+            if (!(key in current)) return true;
+        }
+        return false;
+    }
+
+    document.getElementById('openSettingsBtn').onclick = ()=>{
+        document.getElementById('settingsOverlay').classList.add('active');
+        // 開いた時点のスナップショットを保存
+        _settingsSnapshot = captureSettingsSnapshot();
+    };
+    async function closeSettings() {
+        if (isSettingsDirty()) {
+            const ans = confirm("変更があります。保存しますか？\n\nOK = 保存して閉じる\nキャンセル = 破棄して閉じる");
+            if (ans) {
+                // 保存して閉じる
+                const r = document.getElementById('repoSelect').value;
+                await dbSave('gh_token', document.getElementById('ghToken').value);
+                await dbSave('selected_repo', r);
+                await saveAISettings();
+                document.getElementById('activeRepoDisplay').textContent = r ? r.split('/')[1] : '未接続';
+                await buildAISettingsUI();
+                log("設定を保存しました", "suc");
+            } else {
+                // 破棄して閉じる: 保存済みの値でUIを再構築
+                await buildAISettingsUI();
+                const savedToken = await dbGet('gh_token') || '';
+                const savedRepo = await dbGet('selected_repo') || '';
+                document.getElementById('ghToken').value = savedToken;
+                if (document.getElementById('repoSelect')) {
+                    document.getElementById('repoSelect').value = savedRepo;
+                }
+                log("変更を破棄しました");
+            }
+        }
+        _settingsSnapshot = null;
+        document.getElementById('settingsOverlay').classList.remove('active');
+    }
     document.getElementById('saveSettingsBtn').onclick = async()=>{
         const r=document.getElementById('repoSelect').value;
         await dbSave('gh_token',document.getElementById('ghToken').value);
         await dbSave('selected_repo',r);
+        await saveAISettings();
         document.getElementById('activeRepoDisplay').textContent = r ? r.split('/')[1] : '未接続';
+        // 設定保存後にAIプロバイダUIを再構築（ACTIVEバッジを更新）
+        await buildAISettingsUI();
         closeSettings();
     };
     document.getElementById('verifyTokenBtn').onclick = fetchRepos;
@@ -683,8 +1719,17 @@
             const r = await dbGet('selected_repo');
             if(r) document.getElementById('activeRepoDisplay').textContent = r.split('/')[1];
             renderTabs();
+            // AI設定UI構築
+            await buildAISettingsUI();
+            // カスタムアイコン適用 + PWA初期化
+            const customIcon = await dbGet('customIcon');
+            if (customIcon) {
+                applyCustomIcon(customIcon);
+            } else {
+                initPWA();
+            }
             if(document.getElementById('ghToken').value) fetchRepos();
-        } catch(e) { console.error('Init:',e); renderTabs(); log("データ読み込み失敗","err"); }
+        } catch(e) { console.error('Init:',e); renderTabs(); log("データ読み込み失敗","err"); try { initPWA(); } catch(_){} }
     };
 </script>
 </body>
